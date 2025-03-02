@@ -1,0 +1,1 @@
+Usage: <input.txt> or just run program without parameters and enter three numbers separated by tabs, up to three lines.

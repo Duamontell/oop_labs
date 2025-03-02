@@ -8,6 +8,51 @@
 const int MATRIX_SIZE_3X3 = 3;
 const int MATRIX_SIZE_2X2 = 2;
 
+double GetDeterminantMatrix3x3(double matrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3])
+{
+	double determinant = matrix[0][0] * matrix[1][1] * matrix[2][2] + matrix[0][2] * matrix[1][0] * matrix[2][1]
+		+ matrix[0][1] * matrix[1][2] * matrix[2][0] - matrix[0][2] * matrix[1][1] * matrix[2][0]
+		- matrix[0][0] * matrix[1][2] * matrix[2][1] - matrix[0][1] * matrix[1][0] * matrix[2][2];
+	return determinant;
+}
+
+double GetDeterminantMatrix2x2(double matrix[MATRIX_SIZE_2X2][MATRIX_SIZE_2X2])
+{
+	double determinant = matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+	return determinant;
+}
+
+void CheckDeterminant(double determinant)
+{
+	if (determinant == 0)
+	{
+		throw std::runtime_error("Non-invertible");
+	}
+}
+
+double ChangeSign(double det, int row, int column)
+{
+	if (double parity = (row + column) % 2 == 0)
+	{
+		return det;
+	}
+	else
+	{
+		return -det;
+	}
+}
+
+void MultiplyMatrixByScalar(double invertedMatrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3], double det)
+{
+	for (int i = 0; i < MATRIX_SIZE_3X3; ++i)
+	{
+		for (int j = 0; j < MATRIX_SIZE_3X3; ++j)
+		{
+			invertedMatrix[i][j] = (1 / det) * invertedMatrix[i][j];
+		}
+	}
+}
+
 void FindElementPosition(double minor[MATRIX_SIZE_2X2][MATRIX_SIZE_2X2],
 	double matrixT[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3], int pos, int row, int column)
 {
@@ -46,42 +91,8 @@ void SearchMinor(double minor[MATRIX_SIZE_2X2][MATRIX_SIZE_2X2],
 	}
 }
 
-double GetDeterminantMatrix2x2(double matrix[MATRIX_SIZE_2X2][MATRIX_SIZE_2X2])
-{
-	double determinant = matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
-	return determinant;
-}
-
-double GetDeterminantMatrix3x3(double matrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3])
-{
-	double determinant = matrix[0][0] * matrix[1][1] * matrix[2][2] + matrix[0][2] * matrix[1][0] * matrix[2][1]
-		+ matrix[0][1] * matrix[1][2] * matrix[2][0] - matrix[0][2] * matrix[1][1] * matrix[2][0]
-		- matrix[0][0] * matrix[1][2] * matrix[2][1] - matrix[0][1] * matrix[1][0] * matrix[2][2];
-	return determinant;
-}
-
-void CheckDeterminant(double determinant)
-{
-	if (determinant == 0)
-	{
-		throw std::runtime_error("Non-invertible");
-	}
-}
-
-double ChangeSign(double det, int row, int column)
-{
-	if (double parity = (row + column) % 2 == 0)
-	{
-		return det;
-	}
-	else
-	{
-		return -det;
-	}
-}
-
 void GetInvertMatrix(double matrixT[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3],
-	double invertedMatrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3])
+	double invertedMatrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3], double det)
 {
 	int count = 0;
 	for (int i = 0; i < MATRIX_SIZE_3X3; ++i)
@@ -95,6 +106,7 @@ void GetInvertMatrix(double matrixT[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3],
 			invertedMatrix[i][j] = det;
 		}
 	}
+	MultiplyMatrixByScalar(invertedMatrix, det);
 }
 
 void GetTransposedMatrix(double matrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3],
@@ -109,32 +121,12 @@ void GetTransposedMatrix(double matrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3],
 	}
 }
 
-void CountColumns(std::istream& inputFile)
-{
-	int count = 0;
-	std::string str;
-	std::getline(inputFile, str);
-	std::istringstream iss(str);
-	while (iss >> str)
-	{
-		count++;
-	}
-
-	if (count != MATRIX_SIZE_3X3)
-	{
-		throw std::runtime_error("Invalid matrix format");
-	}
-
-	inputFile.seekg(0);
-}
-
-// Возможно надо переделать и под stdin!
 void GetMatrixFromFile(double matrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3], std::istream& input)
 {
 	std::string line;
-	int rowCount = 0;
-	double num1, num2, num3;
-	CountColumns(input);
+	int rowCount = 0, columnCount = 0;
+	double num;
+	std::string str;
 
 	while (std::getline(input, line))
 	{
@@ -142,20 +134,27 @@ void GetMatrixFromFile(double matrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3], std::ist
 		{
 			throw std::runtime_error("Invalid matrix format");
 		}
-
-		// Возможно стоит сделать while (iss >> num)
 		std::istringstream iss(line);
-		if (iss >> num1 >> num2 >> num3)
+
+		while (iss >> num)
 		{
-			matrix[rowCount][0] = num1;
-			matrix[rowCount][1] = num2;
-			matrix[rowCount][2] = num3;
+			if (columnCount >= MATRIX_SIZE_3X3)
+			{
+				throw std::runtime_error("Invalid matrix format");
+			}
+			matrix[rowCount][columnCount] = num;
+			columnCount++;
 		}
-		else
+		if (!iss.eof())
 		{
 			throw std::runtime_error("Invalid matrix");
 		}
+		if (columnCount != MATRIX_SIZE_3X3)
+		{
+			throw std::runtime_error("Invalid matrix format");
+		}
 		rowCount++;
+		columnCount = 0;
 	}
 
 	if (rowCount != MATRIX_SIZE_3X3)
@@ -180,10 +179,34 @@ void PrintMatrix(double invertedMatrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3])
 	{
 		for (int j = 0; j < MATRIX_SIZE_3X3; ++j)
 		{
-			std::cout << invertedMatrix[i][j] << "\t";
+			std::cout.precision(3);
+			if (j == 2)
+			{
+				std::cout << std::fixed << invertedMatrix[i][j];
+			}
+			else
+			{
+				std::cout << std::fixed << invertedMatrix[i][j] << "\t";
+			}
 		}
-		std::cout << "\n";
+		if (i != 2)
+		{
+			std::cout << "\n";
+		}
 	}
+}
+
+void ProcessMatrix(double matrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3])
+{
+	double determinant = GetDeterminantMatrix3x3(matrix);
+	CheckDeterminant(determinant);
+
+	double matrixT[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3];
+	GetTransposedMatrix(matrix, matrixT);
+	double invertedMatrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3];
+	GetInvertMatrix(matrixT, invertedMatrix, determinant);
+
+	PrintMatrix(invertedMatrix);
 }
 
 void ProcessFileMode(char* argv)
@@ -191,22 +214,14 @@ void ProcessFileMode(char* argv)
 	std::ifstream inputFile = GetInputFile(argv);
 	double matrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3];
 	GetMatrixFromFile(matrix, inputFile);
-
-	double determinant = GetDeterminantMatrix3x3(matrix);
-	CheckDeterminant(determinant);
-
-	double matrixT[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3];
-	GetTransposedMatrix(matrix, matrixT);
-	double invertedMatrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3];
-	GetInvertMatrix(matrixT, invertedMatrix);
-
-	PrintMatrix(invertedMatrix);
+	ProcessMatrix(matrix);
 }
 
 void ProcessStdinMode()
 {
 	double matrix[MATRIX_SIZE_3X3][MATRIX_SIZE_3X3];
 	GetMatrixFromFile(matrix, std::cin);
+	ProcessMatrix(matrix);
 }
 
 int main(int argc, char* argv[])
@@ -215,9 +230,10 @@ int main(int argc, char* argv[])
 	{
 		if (argc == 2)
 		{
-			if (argv[1] == "-h")
+			if (std::string(argv[1]) == "-h")
 			{
-				std::cout << "Usage: <input.txt> or just run program without parameters" << std::endl;
+				std::cout << "Usage: <input.txt> or just run program without parameters and enter "
+						  << "three numbers separated by tabs, up to three lines." << std::endl;
 			}
 			else
 			{
@@ -236,7 +252,6 @@ int main(int argc, char* argv[])
 	catch (const std::exception& e)
 	{
 		std::cout << e.what() << std::endl;
-		return 1;
 	}
 
 	return 0;
