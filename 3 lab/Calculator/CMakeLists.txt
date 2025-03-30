@@ -9,7 +9,12 @@ add_executable(Calculator main.cpp
         src/Calculator.cpp
         include/Calculator.h
         src/Variable.cpp
-        include/Variable.h)
+        include/Variable.h
+        src/Function.cpp
+        include/Function.h
+        src/Expression.cpp
+        include/Expression.h
+)
 
 include_directories(include)
 
@@ -19,6 +24,10 @@ add_executable(tests
         src/Calculator.cpp
         include/Variable.h
         src/Variable.cpp
+        src/Function.cpp
+        include/Function.h
+        src/Expression.cpp
+        include/Expression.h
 )
 
 target_link_libraries(tests gtest)
