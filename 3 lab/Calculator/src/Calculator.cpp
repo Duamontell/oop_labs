@@ -4,48 +4,60 @@
 #include <iostream>
 #include <ostream>
 #include <stdexcept>
-#include <src/gtest-internal-inl.h>
+#include "Constants.h"
 
-void Calculator::VarDeclare(const std::string &newVarName, const std::string &varName)
+void Calculator::VarDeclare(const std::string &newVarName)
 {
-	if (varName.empty())
+	if (m_variables.find(newVarName) != m_variables.end() || m_functions.find(newVarName) != m_functions.end())
 	{
-		m_variables.emplace(newVarName, Variable(newVarName));
+		throw std::invalid_argument("Name already exists");
 	}
-	else
+	m_variables.emplace(newVarName, Variable(newVarName));
+}
+
+void Calculator::EditArrayCalculatedFunctions(const std::string &identifier)
+{
+	std::vector<std::string> keysToRemove;
+	for (auto it = m_fuctionsValues.begin(); it != m_fuctionsValues.end(); ++it)
 	{
-		m_variables.emplace(newVarName, Variable(newVarName));
-		GetVar(newVarName)->SetValue(GetVar(varName)->GetValue());
+		const auto& operands = GetFunction(it->first)->GetExpression().operands;
+		for (auto operand : operands)
+		{
+			if (operand.first == identifier)
+			{
+				keysToRemove.emplace_back(it->first);
+				break;
+			}
+		}
+	}
+
+	for (auto key : keysToRemove)
+	{
+		m_fuctionsValues.erase(key);
+		EditArrayCalculatedFunctions(key);
 	}
 }
 
 void Calculator::VarAssign(const std::string& varName, const std::string& value)
 {
-	if (m_variables.find(varName) != m_variables.end())
+	if (m_variables.find(varName) == m_variables.end() && m_functions.find(varName) == m_functions.end())
 	{
-		try
-		{
-			double number = std::stod(value);
-			GetVar(varName)->SetValue(number);
-		}
-		catch (const std::exception&)
-		{
-			VarDeclare(varName, value);
-		}
+		VarDeclare(varName);
 	}
-	else
-	{
-		VarDeclare(varName, "");
-		
-	}
-}
+	// Из блока catch брать логику и добавить возможность переменной присваивать функцию
 
-void Calculator::PrintVars() const
-{
-	for (const auto &[name, var]: m_variables)
+	try
 	{
-		std::cout << std::setprecision(3) << name << ":" << var.GetValue() << "\n";
+		double number = std::stod(value);
+		GetVar(varName)->SetValue(number);
 	}
+	catch (const std::exception&)
+	{
+		GetVar(varName)->SetValue(GetVar(value)->GetValue());
+	}
+
+	EditArrayCalculatedFunctions(varName);
+
 }
 
 Variable *Calculator::GetVar(const std::string &varName)
@@ -68,7 +80,8 @@ Function *Calculator::GetFunction(const std::string &fnName)
 	throw std::invalid_argument("Name does not exist");
 }
 
-double Calculator::GetOperandValue(const std::string &identifier)
+// Проверить, нужна ли эта функция = НЕ НУЖНА
+/*double Calculator::GetOperandValue(const std::string &identifier)
 {
 	if (IsVar(identifier))
 	{
@@ -76,8 +89,7 @@ double Calculator::GetOperandValue(const std::string &identifier)
 		return var->GetValue();
 	}
 	return GetValue(identifier);
-}
-
+}*/
 
 double Calculator::GetValue(const std::string &identifier)
 {
@@ -85,8 +97,12 @@ double Calculator::GetValue(const std::string &identifier)
 	{
 		return GetVar(identifier)->GetValue();
 	}
+	if (m_fuctionsValues.find(identifier) != m_fuctionsValues.end())
+	{
+		return m_fuctionsValues[identifier];
+	}
 
-	std::map<std::string, std::string> operands = GetFunction(identifier)->GetExpression().GetOperands();
+	std::vector<std::pair<std::string, std::string>> operands = GetFunction(identifier)->GetExpression().operands;
 
 	if (operands.size() == 1)
 	{
@@ -94,12 +110,16 @@ double Calculator::GetValue(const std::string &identifier)
 		std::string newIdentifier = it->first;
 		std::string type = it->second;
 
-		if (type == "variable")
+		if (type == WORD_VARIABLE)
 		{
 			Variable *var = GetVar(newIdentifier);
+			if (!IsVar(identifier))
+			{
+				m_fuctionsValues.emplace(identifier, var->GetValue());
+			}
 			return var->GetValue();
 		}
-		if (type == "function")
+		if (type == WORD_FUNCTION)
 		{
 			Function *fn = GetFunction(newIdentifier);
 			return GetValue(fn->GetName());
@@ -109,20 +129,34 @@ double Calculator::GetValue(const std::string &identifier)
 	if (operands.size() == 2)
 	{
 		auto it = operands.begin();
-		double leftValue = GetOperandValue(it->first);
+		double leftValue = GetValue(it->first);
 		++it;
-		double rightValue = GetOperandValue(it->first);
+		double rightValue = GetValue(it->first);
 
-		std::string operation = GetFunction(identifier)->GetExpression().GetOperation();
-		if (operation == "+") return leftValue + rightValue;
-		if (operation == "-") return leftValue - rightValue;
-		if (operation == "*") return leftValue * rightValue;
-		if (operation == "/")
+		std::string operation = GetFunction(identifier)->GetExpression().operation;
+		if (operation == OPERATION_PLUS)
+		{
+			m_fuctionsValues.insert({identifier, leftValue + rightValue});
+			return leftValue + rightValue;
+		}
+		if (operation == OPERATION_MINUS)
+		{
+			m_fuctionsValues.insert({identifier, leftValue - rightValue});
+			return leftValue - rightValue;
+		}
+		if (operation == OPERATION_MULTIPLY)
+		{
+			m_fuctionsValues.insert({identifier, leftValue * rightValue});
+			return leftValue * rightValue;
+		}
+		if (operation == OPERATION_DIVIDE)
 		{
 			if (rightValue == 0)
 			{
+				m_fuctionsValues.insert({identifier, NAN});
 				return NAN;
 			}
+			m_fuctionsValues.insert({identifier, leftValue / rightValue});
 			return leftValue / rightValue;
 		}
 	}
@@ -131,6 +165,7 @@ double Calculator::GetValue(const std::string &identifier)
 
 bool Calculator::IsVar(const std::string &identifier)
 {
+	// Добавить метод, который возвращает опциональное значение
 	try
 	{
 		GetVar(identifier);
@@ -145,38 +180,61 @@ bool Calculator::IsVar(const std::string &identifier)
 
 void Calculator::FunctionDeclareIdentifier(const std::string &fnName, const std::string &identifierName)
 {
+	if (m_functions.find(fnName) != m_functions.end() || m_variables.find(fnName) != m_variables.end())
+	{
+		throw std::invalid_argument("Name already exists");
+	}
 	m_functions.emplace(fnName, Function(fnName));
-	std::map<std::string, std::string> expression = {};
+	std::vector<std::pair<std::string, std::string>> expression = {};
 	if (!IsVar(identifierName))
 	{
-		expression = {{identifierName, "function"}};
+		expression = {{identifierName, WORD_FUNCTION}};
 	}
 	else
 	{
-		expression = {{identifierName, "variable"}};
+		expression = {{identifierName, WORD_VARIABLE}};
 	}
 	GetFunction(fnName)->SetValue(expression);
 }
 
 void Calculator::FunctionDeclareOperation(const std::string &fnName, const std::vector<std::string> &tokens)
 {
+	if (m_functions.find(fnName) != m_functions.end() || m_variables.find(fnName) != m_variables.end())
+	{
+		throw std::invalid_argument("Name already exists");
+	}
+	std::vector<std::pair<std::string, std::string>> expression = {{tokens[1], "operation"}};
+	expression.emplace_back(tokens[0], IsVar(tokens[0]) ? WORD_VARIABLE : WORD_FUNCTION);
+	expression.emplace_back(tokens[2], IsVar(tokens[2]) ? WORD_VARIABLE : WORD_FUNCTION);
 	m_functions.emplace(fnName, Function(fnName));
-	std::map<std::string, std::string> expression = {{tokens[1], "operation"}};
-	if (!IsVar(tokens[0]))
-	{
-		expression.insert({tokens[0], "function"});
-	}
-	else
-	{
-		expression.insert({tokens[0], "variable"});
-	}
-	if (!IsVar(tokens[2]))
-	{
-		expression.insert({tokens[2], "function"});
-	}
-	else
-	{
-		expression.insert({tokens[2], "variable"});
-	}
 	GetFunction(fnName)->SetValue(expression);
+}
+
+void Calculator::PrintIdentifier(const std::string &identifierName)
+{
+	if (m_variables.find(identifierName) != m_variables.end()
+		|| m_functions.find(identifierName) != m_functions.end())
+	{
+		std::cout << std::setprecision(3) << GetValue(identifierName) << std::endl;
+	}
+	else
+	{
+		throw std::invalid_argument("Name does not exist");
+	}
+}
+
+void Calculator::PrintVars()
+{
+	for (const auto &[name, var]: m_variables)
+	{
+		std::cout << std::setprecision(3) << name << OUTPUT_DELIMETER << var.GetValue() << "\n";
+	}
+}
+
+void Calculator::PrintFunctions()
+{
+	for (auto &[name, function]: m_functions)
+	{
+		std::cout << std::setprecision(3) << name << OUTPUT_DELIMETER << GetValue(name) << "\n";
+	}
 }

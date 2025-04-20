@@ -14,6 +14,9 @@ add_executable(Calculator main.cpp
         include/Function.h
         src/Expression.cpp
         include/Expression.h
+        src/CalculatorController.cpp
+        include/CalculatorController.h
+        include/Constants.h
 )
 
 include_directories(include)
@@ -28,6 +31,8 @@ add_executable(tests
         include/Function.h
         src/Expression.cpp
         include/Expression.h
+        src/CalculatorController.cpp
+        include/CalculatorController.h
 )
 
 target_link_libraries(tests gtest)

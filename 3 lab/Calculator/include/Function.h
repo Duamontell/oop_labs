@@ -1,14 +1,20 @@
 #ifndef FUNCTION_H
 #define FUNCTION_H
-#include "Expression.h"
+/*#include "Expression.h"*/
 #include <string>
+#include <vector>
 
+struct Expression
+{
+	std::string operation;
+	std::vector<std::pair<std::string, std::string>> operands;
+};
 
 class Function
 {
 public:
 	explicit Function(const std::string &fnName) : m_name(fnName) {}
-	void SetValue(const std::map<std::string, std::string> &expression);
+	void SetValue(const std::vector<std::pair<std::string, std::string>> &expression);
 
 	std::string GetName();
 	Expression GetExpression();
